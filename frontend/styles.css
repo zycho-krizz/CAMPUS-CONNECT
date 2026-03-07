@@ -346,6 +346,20 @@ p {
     flex: 1;
 }
 
+.error-text {
+    color: #ff4d4f;
+    font-size: 0.85rem;
+    margin-top: 0.4rem;
+    display: block;
+}
+
+.otp-input {
+    text-align: center;
+    letter-spacing: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
 /* Dashboard Home */
 .section-title {
     font-size: 1.4rem;

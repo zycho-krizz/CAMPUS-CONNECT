@@ -172,19 +172,52 @@
                     <!-- Sign Up Form (Hidden by default) -->
                     <form id="form-signup" class="hidden" onsubmit="app.handleSignup(event)">
                         <h2>Create Account</h2>
-                        <div class="input-group">
-                            <label>Full Name</label>
-                            <input type="text" id="signup-name" required placeholder="John Doe">
+
+                        <!-- Step 1: Details -->
+                        <div id="signup-step-1">
+                            <div class="input-group">
+                                <label>Full Name</label>
+                                <input type="text" id="signup-name" required placeholder="John Doe">
+                            </div>
+                            <div class="input-group">
+                                <label>College Email ID</label>
+                                <input type="email" id="signup-email" required placeholder="student@cea.ac.in">
+                                <span id="email-error" class="error-text hidden">Access restricted to College of
+                                    Engineering, Adoor students. Please use your College email id.</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Password</label>
+                                <input type="password" id="signup-password" required placeholder="••••••••">
+                            </div>
+                            <button type="submit" class="btn btn-primary full-width" id="btn-send-otp">
+                                <span id="btn-send-otp-text">Send OTP</span>
+                                <i class="fa-solid fa-spinner fa-spin hidden" id="btn-send-otp-spinner"></i>
+                            </button>
                         </div>
-                        <div class="input-group">
-                            <label>College Email ID</label>
-                            <input type="email" id="signup-email" required placeholder="student@campus.edu">
+
+                        <!-- Step 2: OTP Verification -->
+                        <div id="signup-step-2" class="hidden">
+                            <p class="modal-note" style="margin-bottom: 1rem;"><i
+                                    class="fa-solid fa-envelope-circle-check"></i> We've sent a 6-digit code to your
+                                email.</p>
+                            <div class="input-group">
+                                <label>Verification Code</label>
+                                <input type="text" id="signup-otp" class="otp-input" maxlength="6" pattern="[0-9]{6}"
+                                    placeholder="000000" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+                            </div>
+                            <button type="button" class="btn btn-primary full-width" id="btn-verify-otp"
+                                onclick="app.verifyOTP(event)">Verify & Create Account</button>
+                            <div style="text-align: center; margin-top: 1rem;">
+                                <button type="button" class="btn btn-text" id="btn-resend-otp"
+                                    onclick="app.resendOTP(event)"
+                                    style="color: var(--purple-primary); font-size: 0.9rem;">Resend Code</button>
+                                <span id="resend-timer" class="hidden"
+                                    style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-top: 0.2rem;"></span>
+                            </div>
+                            <button type="button" class="btn btn-text" onclick="app.backToSignupStep1()"
+                                style="color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem; width: 100%;"><i
+                                    class="fa-solid fa-arrow-left"></i> Change details</button>
                         </div>
-                        <div class="input-group">
-                            <label>Password</label>
-                            <input type="password" id="signup-password" required placeholder="••••••••">
-                        </div>
-                        <button type="submit" class="btn btn-primary full-width">Sign Up</button>
                     </form>
                 </div>
             </div>

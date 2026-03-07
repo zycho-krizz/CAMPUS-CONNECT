@@ -252,6 +252,10 @@ const app = {
         if (tab === 'login') {
             document.getElementById('form-login').classList.remove('hidden');
             document.getElementById('form-signup').classList.add('hidden');
+            // reset signup flow
+            document.getElementById('signup-step-1').classList.remove('hidden');
+            document.getElementById('signup-step-2').classList.add('hidden');
+            if (this._resendInterval) clearInterval(this._resendInterval);
         } else {
             document.getElementById('form-login').classList.add('hidden');
             document.getElementById('form-signup').classList.remove('hidden');
@@ -275,24 +279,167 @@ const app = {
         }
     },
 
-    handleSignup(e) {
+    async handleSignup(e) {
         e.preventDefault();
         const fullName = document.getElementById('signup-name').value;
         const email = document.getElementById('signup-email').value;
         const password = document.getElementById('signup-password').value;
 
+        // Front-end Domain Validation
+        const emailError = document.getElementById('email-error');
+        if (!email.toLowerCase().endsWith('@cea.ac.in')) {
+            emailError.classList.remove('hidden');
+            return;
+        } else {
+            emailError.classList.add('hidden');
+        }
+
         const users = JSON.parse(localStorage.getItem('users_db'));
         if (users.find(u => u.email === email)) {
-            this.showToast('Email already exists', 'error');
+            this.showToast('Email already registered', 'error');
             return;
         }
 
-        const newUser = { id: Date.now(), fullName, email, password, role: 'student' };
-        users.push(newUser);
-        localStorage.setItem('users_db', JSON.stringify(users));
+        const btn = document.getElementById('btn-send-otp');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
+        btn.disabled = true;
 
-        this.showToast('Registration successful! Please login.', 'success');
-        this.switchAuthTab('login');
+        try {
+            // Trigger Real Backend OTP 
+            const response = await fetch('http://localhost:5000/api/auth/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fullName, email, password })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to send OTP');
+            }
+
+            this.showToast('OTP verification code sent to your email', 'info');
+
+            // Advance UI
+            document.getElementById('signup-step-1').classList.add('hidden');
+            document.getElementById('signup-step-2').classList.remove('hidden');
+
+            // Store temporarily for verify payload
+            this.state._tempSignupEmail = email;
+            this.state._tempSignupName = fullName;
+            this.state._tempSignupPass = password;
+
+            this.startResendTimer();
+        } catch (error) {
+            this.showToast(error.message, 'error');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    },
+
+    backToSignupStep1() {
+        document.getElementById('signup-step-1').classList.remove('hidden');
+        document.getElementById('signup-step-2').classList.add('hidden');
+        if (this._resendInterval) clearInterval(this._resendInterval);
+        document.getElementById('btn-send-otp').disabled = false;
+        document.getElementById('btn-send-otp').textContent = "Send Verification OTP";
+    },
+
+    startResendTimer() {
+        let timeLeft = 60;
+        const resendContainer = document.getElementById('resend-container');
+        resendContainer.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">Wait ${timeLeft}s before resending</span>`;
+
+        if (this._resendInterval) clearInterval(this._resendInterval);
+
+        this._resendInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 0) {
+                clearInterval(this._resendInterval);
+                resendContainer.innerHTML = `<button type="button" class="btn-text" onclick="app.resendOTP()" style="color:var(--primary); padding:0;">Re-send Code</button>`;
+            } else {
+                resendContainer.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">Wait ${timeLeft}s before resending</span>`;
+            }
+        }, 1000);
+    },
+
+    async resendOTP() {
+        const email = this.state._tempSignupEmail;
+        const fullName = this.state._tempSignupName;
+        const password = this.state._tempSignupPass;
+
+        this.showToast('Resending OTP...', 'info');
+
+        try {
+            const response = await fetch('http://localhost:5000/api/auth/send-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fullName, email, password })
+            });
+
+            if (!response.ok) throw new Error('Failed to resend');
+
+            this.showToast('New OTP sent', 'success');
+            this.startResendTimer();
+        } catch (error) {
+            this.showToast('Error resending OTP', 'error');
+        }
+    },
+
+    async verifyOTP(e) {
+        e.preventDefault();
+        const otp = document.getElementById('signup-otp').value;
+        const email = this.state._tempSignupEmail;
+
+        const btn = document.getElementById('btn-verify-otp');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('http://localhost:5000/api/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, otp })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Invalid verification code');
+            }
+
+            // Also mock-add them locally so they can log in seamlessly
+            const users = JSON.parse(localStorage.getItem('users_db')) || [];
+            users.push({
+                id: Date.now(),
+                fullName: this.state._tempSignupName,
+                email: this.state._tempSignupEmail,
+                password: this.state._tempSignupPass,
+                role: 'student'
+            });
+            localStorage.setItem('users_db', JSON.stringify(users));
+
+            this.showToast('Account verified and created successfully!', 'success');
+
+            // Clean up
+            delete this.state._tempSignupEmail;
+            delete this.state._tempSignupName;
+            delete this.state._tempSignupPass;
+
+            // Switch back to login view smoothly
+            document.getElementById('signup-step-1').classList.remove('hidden');
+            document.getElementById('signup-step-2').classList.add('hidden');
+            document.getElementById('form-signup').reset();
+            this.switchAuthTab('login');
+            // prefill email
+            document.getElementById('login-email').value = email;
+
+        } catch (error) {
+            this.showToast(error.message, 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     },
 
     setSession(token, user) {
